@@ -1,4 +1,4 @@
-# coconut-quiz-arena
+# Coconut-Quiz-Arena
 Coconut Quiz Arena Offline App
 
 # 🥥 COCONUT QUIZ ARENA
