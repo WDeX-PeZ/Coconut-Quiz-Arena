@@ -1,7 +1,7 @@
 // Coconut Quiz Arena - PWA Update System
 // Tăng số phiên bản mỗi lần phát hành bản mới.
 
-const CACHE_NAME = "cqa-quiz-arena-v1";
+const CACHE_NAME = "cqa-quiz-arena-";
 
 // Tự xác định thư mục ứng dụng trên GitHub Pages.
 // Cách này hoạt động cả khi repository nằm trong /ten-repo/.
