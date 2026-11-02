@@ -1,54 +1,104 @@
-const CACHE_NAME = "coconut-quiz-arena-v1";
-const FILES = [
-  "./",
-  "./index.html",
-  "./manifest.webmanifest"
-];
+// Coconut Quiz Arena - PWA Update System
+// Tăng số phiên bản mỗi lần phát hành bản mới.
 
-self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(FILES))
-      .then(() => self.skipWaiting())
-  );
+const CACHE_NAME = "cqa-quiz-arena-v1";
+
+// Tự xác định thư mục ứng dụng trên GitHub Pages.
+// Cách này hoạt động cả khi repository nằm trong /ten-repo/.
+const HOME_URL = new URL("./", self.registration.scope).href;
+
+// Cài đặt phiên bản mới và lưu trang chính vào cache mới.
+self.addEventListener("install", (event) => {
+  event.waitUntil((async () => {
+    const response = await fetch(
+      new Request(HOME_URL, { cache: "reload" })
+    );
+
+    if (!response.ok) {
+      throw new Error("Không tải được trang Coconut Quiz Arena.");
+    }
+
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(HOME_URL, response);
+  })());
 });
 
-self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(
-        keys.filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      ))
-      .then(() => self.clients.claim())
-  );
+// Kích hoạt phiên bản mới và dọn cache cũ của Coconut Quiz Arena.
+self.addEventListener("activate", (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+
+    await Promise.all(
+      keys
+        .filter(key =>
+          key.startsWith("cqa-quiz-arena-") &&
+          key !== CACHE_NAME
+        )
+        .map(key => caches.delete(key))
+    );
+
+    await self.clients.claim();
+  })());
 });
 
-self.addEventListener("fetch", event => {
-  if (event.request.method !== "GET") return;
+// Chỉ kích hoạt ngay khi người dùng bấm nút Cập nhật.
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
 
-  const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) return;
+// Ưu tiên bản ứng dụng đã cache để tránh đổi phiên bản giữa lúc đang dùng.
+// Khi chưa có cache, thử tải từ mạng.
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
 
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
+  if (
+    request.method !== "GET" ||
+    request.mode !== "navigate"
+  ) {
+    return;
+  }
 
-      return fetch(event.request).then(response => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME)
-            .then(cache => cache.put(event.request, copy));
+  const url = new URL(request.url);
+  const scope = new URL(self.registration.scope);
+
+  if (
+    url.origin !== scope.origin ||
+    !url.pathname.startsWith(scope.pathname)
+  ) {
+    return;
+  }
+
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+
+    const cached =
+      await cache.match(request) ||
+      await cache.match(HOME_URL);
+
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      const response = await fetch(request);
+
+      if (response.ok) {
+        await cache.put(HOME_URL, response.clone());
+      }
+
+      return response;
+    } catch (error) {
+      return new Response(
+        "Bạn đang ngoại tuyến. Hãy kết nối Internet rồi thử lại.",
+        {
+          status: 503,
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8"
+          }
         }
-        return response;
-      }).catch(() => {
-        if (event.request.mode === "navigate") {
-          return caches.match("./index.html");
-        }
-        return new Response("Bạn đang ngoại tuyến.", {
-          status: 503
-        });
-      });
-    })
-  );
+      );
+    }
+  })());
 });
