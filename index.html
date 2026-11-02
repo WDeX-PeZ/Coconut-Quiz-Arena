@@ -1210,12 +1210,141 @@ function fxScan(){if(!IO)return;IO.disconnect();if(!FXon()||QT=='low'||V=='run')
  addEventListener('pointerdown',e=>{const b=e.target.closest?.('button,.md,.sc');if(!b||b.disabled||b.closest('nav'))return;if(!b.matches('.o'))snd('tick');if(!FXP||!FXon()||QT!='high'||!b.matches('button'))return;b.querySelector(':scope>.rp')?.remove();const r=b.getBoundingClientRect(),d=Math.max(r.width,r.height)*2,p=document.createElement('span');p.className='rp';p.style.cssText=`width:${d}px;height:${d}px;left:${e.clientX-r.left-d/2}px;top:${e.clientY-r.top-d/2}px`;b.append(p);setTimeout(()=>p.remove(),600)},{passive:true})})();
 ap();save();R();setTimeout(probe,700);
 </script>
-<script>
-// Coconut Quiz Arena PWA: offline cache registration.
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').catch(err => console.warn('PWA offline setup:', err));
-  });
-}
-</script>
 </body></html>
+<script>
+(() => {
+  if (!("serviceWorker" in navigator)) return;
+
+  const hadController = Boolean(
+    navigator.serviceWorker.controller
+  );
+
+  let bannerShown = false;
+
+  function showUpdate(worker) {
+    if (!worker || bannerShown) return;
+
+    bannerShown = true;
+
+    const bar = document.createElement("div");
+
+    bar.style.cssText = `
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 14px;
+      border-radius: 14px;
+      background: #171923;
+      color: white;
+      box-shadow: 0 5px 24px rgba(0,0,0,.3);
+      font: 14px Arial, sans-serif;
+    `;
+
+    const message = document.createElement("span");
+    message.textContent =
+      "Có bản cập nhật mới cho Coconut Quiz Arena.";
+
+    const actions = document.createElement("div");
+    actions.style.cssText =
+      "display:flex;gap:8px;align-items:center;";
+
+    const updateButton = document.createElement("button");
+    updateButton.textContent = "Cập nhật";
+
+    updateButton.style.cssText = `
+      border: 0;
+      border-radius: 9px;
+      padding: 10px 15px;
+      background: #ffffff;
+      color: #171923;
+      font-weight: bold;
+      cursor: pointer;
+    `;
+
+    const laterButton = document.createElement("button");
+    laterButton.textContent = "Để sau";
+
+    laterButton.style.cssText = `
+      border: 0;
+      border-radius: 9px;
+      padding: 10px 12px;
+      background: #343746;
+      color: white;
+      cursor: pointer;
+    `;
+
+    updateButton.addEventListener("click", () => {
+      updateButton.disabled = true;
+      updateButton.textContent = "Đang cập nhật...";
+
+      worker.postMessage({ type: "SKIP_WAITING" });
+    });
+
+    laterButton.addEventListener("click", () => bar.remove());
+
+    actions.append(updateButton, laterButton);
+    bar.append(message, actions);
+    document.body.appendChild(bar);
+  }
+
+  navigator.serviceWorker.addEventListener(
+    "controllerchange",
+    () => {
+      if (hadController) {
+        window.location.reload();
+      }
+    }
+  );
+
+  const swURL = new URL(
+    "./service-worker.js",
+    window.location.href
+  );
+
+  const appScope = new URL(
+    "./",
+    window.location.href
+  ).pathname;
+
+  navigator.serviceWorker.register(swURL, {
+    scope: appScope,
+    updateViaCache: "none"
+  })
+  .then((registration) => {
+    if (
+      registration.waiting &&
+      navigator.serviceWorker.controller
+    ) {
+      showUpdate(registration.waiting);
+    }
+
+    registration.addEventListener("updatefound", () => {
+      const newWorker = registration.installing;
+      if (!newWorker) return;
+
+      newWorker.addEventListener("statechange", () => {
+        if (
+          newWorker.state === "installed" &&
+          navigator.serviceWorker.controller
+        ) {
+          showUpdate(registration.waiting || newWorker);
+        }
+      });
+    });
+
+    registration.update().catch(() => {});
+  })
+  .catch(error => {
+    console.error("Service Worker error:", error);
+  });
+})();
+</script>
+</body>
+</html>
